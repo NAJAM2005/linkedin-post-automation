@@ -1,0 +1,274 @@
+{
+  "name": "LinkedIn Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Topic of research :{{ $json['Post Topic'] }}\nTarget audience:{{ $json['Target Audience'] }}",
+        "options": {
+          "systemMessage": "## Role\n\nYou are an AI agent specialized in creating professional, educational, and engaging LinkedIn posts on any topic provided by the user.\n\nYour posts should appeal to the specified target audience. If no audience is provided, default to: \nprofessionals, founders, and tech enthusiasts\n.\n\n\n## Research Process\n\nAlways begin by conducting a real-time search using the Tavily tool to gather the most accurate, up-to-date information on the topic.\n\nIf Tavily returns no useful results, proceed using your own knowledge — do not mention the search failure in your output.\n\nPrioritize recent data, statistics, case studies, and credible sources (e.g., Forbes, McKinsey, Reuters, peer-reviewed papers).\n\n\n## Post Structure\n\nHook (Line 1):\n Open with a bold statement, a surprising stat, or a thought-provoking question. Make it impossible to scroll past.\n\nBody:\n 3–5 short, punchy paragraphs or bullet points. Educational, insightful, and easy to scan.\n\nSource citation:\n Reference key data points naturally (e.g., \"According to [Source], …\").\n\nCall to Action:\n End with a varied CTA — rotate between asking a question, requesting opinions, inviting shares, or prompting reflection. Never repeat the same CTA pattern twice.\n\nHashtags:\n Add 3–5 relevant hashtags at the bottom to improve visibility.\n\n\n## Writing Style\n\nTone: Conversational yet authoritative. Avoid corporate jargon and stiff language.\n\nLength: \n150–280 words\n (optimized for LinkedIn's \"see more\" cutoff at ~210 characters).\n\nUse emojis sparingly — only when they are highly relevant and add clarity (max 2–3 per post).\n\nUse short paragraphs and line breaks for readability on mobile.\n\n\n## Output Rules\n\n⚠ Your ONLY output must be the final LinkedIn post text. Do not include explanations, notes, labels, or anything beyond the post itself.\n\n\n## Example Workflow\n\n1.\nReceive a topic (e.g., \"The ROI of warehouse automation\")\n\n2.\nUse Tavily to search for recent data, stats, or case studies on the topic\n\n3.\nIf search fails, use internal knowledge as fallback — never mention the failure\n\n4.\nDraft a LinkedIn post following the structure above\n\n5.\nFormat with clean structure, source citations, a varied CTA, and relevant hashtags\n\n6.\nOutput only the final post — nothing else"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [224, -96],
+      "id": "0b5650ce-a1c5-4880-a8b1-f6517b45d17f",
+      "name": "Research Agent",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=LinkedIn Post: {{ $json.output }}",
+        "options": {
+          "systemMessage": "\"You are a visual designer. Based on the LinkedIn post provided, create a 1-sentence, 10-word visual description for an image generator. Output ONLY the description. Focus on professional lighting and a modern tech style. Example: 'A futuristic workspace with holographic displays, cinematic lighting, 4k.'\""
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [576, -96],
+      "id": "47633107-f03e-4c12-a08b-b153c7857fa7",
+      "name": "Image Agent"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.pexels.com/v1/search?query={{ $('On form submission').item.json['Post Topic'] }}&per_page=1&orientation=square",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "YOUR_PEXELS_API_KEY"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [928, -96],
+      "id": "fcaafa1e-6241-473e-ab04-ff688f568263",
+      "name": "Image Generater"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://google.serper.dev/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "YOUR_SERPER_API_KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json['Post Topic'] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [368, 128],
+      "id": "696b7d7e-fa5f-4c2a-8d1e-c60451e6d27a",
+      "name": "Serper"
+    },
+    {
+      "parameters": {
+        "formTitle": "Post Creater",
+        "formFields": {
+          "values": [
+            { "fieldLabel": "Post Topic" },
+            { "fieldLabel": "Target Audience" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [0, -96],
+      "id": "9629f583-ddd6-4bf4-9475-83d81a7de4b6",
+      "name": "On form submission",
+      "webhookId": "8b83c317-6755-4cdb-8be2-917b2928f397"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "sendTo": "YOUR_EMAIL@gmail.com",
+        "subject": "Review Required: LinkedIn Post for",
+        "message": "=<h2>Review your AI-generated post</h2>\n\n<p><strong>Proposed Image:</strong></p>\n<img src=\"{{ $node['Image Generater'].json.photos[0].src.large }}\" width=\"400\">\n\n<p><strong>Post Text:</strong></p>\n<div style=\"background: #f4f4f4; padding: 15px; border-radius: 8px;\">\n  {{ $node['Research Agent'].json.output.replace(/\\n/g, '<br>') }}\n</div>",
+        "responseType": "customForm",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "editedPost",
+              "fieldType": "textarea",
+              "placeholder": "Enter your final post content here...",
+              "defaultValue": "={{ $('Research Agent').item.json.output }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [1376, -96],
+      "id": "b1eee132-7cbb-4974-aa3f-513912e5eb68",
+      "name": "Send message and wait for response",
+      "webhookId": "74b8c842-b622-4f71-af08-c31450d5959e",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-1.5-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [240, 128],
+      "id": "6c254f74-4034-4868-8f58-44fd3cc08303",
+      "name": "Google Gemini Chat Model",
+      "retryOnFail": false,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Gemini API account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const postText = items[0].json.data.editedPost\n  .replace(/[\\r\\n]+/g, ' ')\n  .trim();\n\nconst escaped = JSON.stringify(postText);\n\nconst body = `{\"author\":\"urn:li:person:YOUR_PERSON_URN\",\"lifecycleState\":\"PUBLISHED\",\"specificContent\":{\"com.linkedin.ugc.ShareContent\":{\"shareCommentary\":{\"text\":${escaped}},\"shareMediaCategory\":\"NONE\"}},\"visibility\":{\"com.linkedin.ugc.MemberNetworkVisibility\":\"PUBLIC\"}}`;\n\nreturn [{ json: { body: body } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1600, -96],
+      "id": "bbd54221-fbfb-4a57-bc3e-096073b009b9",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.photos[0].src.large }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1152, -96],
+      "id": "d6d0e140-fb2c-4a7c-8a8e-356c22861d9a",
+      "name": "image converter"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linkedin.com/v2/ugcPosts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_LINKEDIN_ACCESS_TOKEN"
+            },
+            {
+              "name": "X-Restli-Protocol-Version",
+              "value": "2.0.0"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "LinkedIn-Version",
+              "value": "202401"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "{{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1824, -96],
+      "id": "6cacc246-84ba-467e-8048-df65dbb86d82",
+      "name": "linkedin",
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Research Agent": {
+      "main": [[{ "node": "Image Agent", "type": "main", "index": 0 }]]
+    },
+    "Image Agent": {
+      "main": [[{ "node": "Image Generater", "type": "main", "index": 0 }]]
+    },
+    "Serper": {
+      "ai_tool": [[{ "node": "Research Agent", "type": "ai_tool", "index": 0 }]]
+    },
+    "Image Generater": {
+      "main": [[{ "node": "image converter", "type": "main", "index": 0 }]]
+    },
+    "On form submission": {
+      "main": [[{ "node": "Research Agent", "type": "main", "index": 0 }]]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          { "node": "Image Agent", "type": "ai_languageModel", "index": 0 },
+          { "node": "Research Agent", "type": "ai_languageModel", "index": 0 }
+        ]
+      ]
+    },
+    "Send message and wait for response": {
+      "main": [[{ "node": "Code in JavaScript", "type": "main", "index": 0 }]]
+    },
+    "Code in JavaScript": {
+      "main": [[{ "node": "linkedin", "type": "main", "index": 0 }]]
+    },
+    "image converter": {
+      "main": [[{ "node": "Send message and wait for response", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "ffe1738d-0730-40d1-9a49-c1a6b5fd236c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "REPLACE_WITH_YOUR_INSTANCE_ID"
+  },
+  "id": "MV9wZ4lOB2hxmR64",
+  "tags": []
+}
